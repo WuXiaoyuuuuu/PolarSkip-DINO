@@ -1,0 +1,143 @@
+# PolarSkip-DINO
+
+**Real-Time Single-Frame Indoor mmWave Radar Point Cloud Reconstruction with Frozen Visual Backbones and Dual-Tier Readout**
+
+PolarSkip-DINO reconstructs dense, LiDAR-like 2D indoor point clouds from a **single 77 GHz mmWave radar frame** at **20.6 Hz (`48.52 ms`)** on a single GPU.
+
+### Highlights
+- **Frozen Visual Backbone + Cartesian Decoding**: Transfers a completely frozen **DINOv3-S/16** encoder into an isotropic metric Cartesian U-Net decoder, avoiding range-dependent polar convolutional distortion.
+- **Lightweight PolarSkip Branch (`+0.19M` params)**: Preserves native 64-bin angular resolution with azimuthally dilated residual blocks (`dilation=(1, 2)`) to sharpen wall centerlines and reduce cross-seed variance by over `6×`.
+- **Zero-Training Dual-Tier Readout (`1.74 ms` CPU)**: Combines top-scoring primary pixels with deterministic uniform sampling over the weak-support probability band to recover far-field (`≥6 m`) walls without retraining.
+- **Real-Time & Portable**: Only **2.50M trainable parameters** (`24.10M` total, `63.08 GFLOPs`) — **87.2× faster**, **297× fewer FLOPs**, and **36.0× fewer parameters** than 50-step latent diffusion (`RadarSFD`).
+
+---
+
+## Main Results
+
+### 1. RadarHD Benchmark (`18,075` Held-Out Test Frames, 19 Trajectories)
+
+| Method | Total / Trainable Params | `bs=1` GFLOPs | Strict `bs=1` E2E (ms) | CD (m) ↓ | F1@20cm ↑ | F1@10cm ↑ | F1@5cm ↑ | ≥6m Recall ↑ |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| U-Net (Scratch) | 1.93M / 1.93M | 36.88 | — | 0.5938 | 37.10% | 25.67% | 16.26% | 9.58% |
+| RadarHD (ICRA 2023) | — | — | — | 0.4593 | 47.79% | 34.65% | 23.72% | 22.28% |
+| RadarSFD (50-step, FP16) | 868.37M / — | 18,755.73 | 4,228.77 | 0.3552 | 52.90% | 38.22% | 25.50% | 21.82% |
+| **PolarSkip-DINO (Lite, 3-seed)** | 23.92M / 2.31M | 59.97 | **42.95 (23.3 Hz)** | 0.3018 | 59.66% | 41.86% | 28.13% | 32.85% |
+| **PolarSkip-DINO (Full, 3-seed)** | **24.10M / 2.50M** | **63.08** | **48.52 (20.6 Hz)** | **0.3000** | **60.52%** | **43.17%** | **29.50%** | **32.51%** |
+| *PolarSkip-DINO (Same-K ≈ 939)* | *24.10M / 2.50M* | *63.08* | *48.52* | *0.3119* | *58.97%* | *41.79%* | *28.23%* | *28.23%* |
+
+On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO reduces sequential point-to-point ICP translation error by **2.2–3.3×** (`2.09–3.70 cm` vs. `6.92–8.21 cm`) and improves multi-frame 2D occupancy grid mapping IoU up to **44.6%** vs. `36.4%`.
+
+![RadarHD Single-Frame Comparison](assets/radarhd_comparison.png)
+
+### 2. Cross-Sensor Generalization on ColoRadar (`300` Unseen Frames Across 3 Environments)
+
+| Protocol | Method | CD (m) ↓ | F1@20cm ↑ | P@20cm ↑ | F1@30cm ↑ | ≥5m Recall ↑ | `Same-K` F1@20 ↑ |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Zero-Shot (No Fine-Tuning) | RadarSFD | 0.7735 | 24.31% | 33.14% | 32.92% | 6.84% | 24.31% |
+| Zero-Shot (No Fine-Tuning) | **PolarSkip-DINO** | **0.5824** | **36.51%** | **34.37%** | **46.68%** | **19.08%** | **32.87%** |
+| 3-Fold LOBO (Unseen Building) | U-Net (Scratch, 2000 st) | 0.5701 | 42.78% | 54.95% | 52.25% | 13.23% | 41.35% |
+| 3-Fold LOBO (Unseen Building) | **PolarSkip-DINO (4 min, 800 st)** | **0.5367** | **49.88%** | **55.63%** | **58.63%** | **19.49%** | **47.13%** |
+
+![ColoRadar 3-Building Generalization](assets/coloradar_lobo.png)
+
+---
+
+## Repository Structure
+
+```text
+PolarSkip-DINO/
+├── configs/
+│   ├── radarhd.yaml          # RadarHD training & dual-tier readout config
+│   └── coloradar.yaml        # ColoRadar zero-shot & 3-fold LOBO config
+├── polarskip_dino/
+│   ├── geometry.py           # Exact voxel-center polar <-> Cartesian grids
+│   ├── model.py              # Frozen DINOv3-S/16 + PolarSkip + Cartesian U-Net
+│   ├── loss.py               # Batch-invariant ROI WBCE + L1-SoftDice loss
+│   ├── readout.py            # Zero-training continuous dual-tier budgeted readout
+│   ├── dataset.py            # RadarHD dataset_5 loader & ColoRadar slice_mid2 helper
+│   └── metrics.py            # CD, F1@20/10/5cm, and far-field recall
+├── scripts/
+│   ├── train.py              # Train PolarSkip-DINO (Full or Lite)
+│   ├── eval_radarhd.py       # Evaluate on RadarHD test split
+│   ├── infer_single.py       # Single-frame inference & BEV visualization
+│   └── benchmark_latency.py  # Strict Batch=1 end-to-end latency profiler
+├── checkpoints/              # Place downloaded .pth weights here (gitignored)
+├── assets/                   # Visual comparison figures
+└── requirements.txt
+```
+
+---
+
+## Installation
+
+```bash
+conda create -n polarskip python=3.11 -y
+conda activate polarskip
+pip install -r requirements.txt
+```
+
+Clone Meta's official [DINOv3](https://github.com/facebookresearch/dinov3) repository (or let `torch.hub` fetch it) and obtain the `dinov3_vits16_pretrain_lvd1689m-08c60483.pth` weights. See [`checkpoints/README.md`](checkpoints/README.md) for our lightweight `9.7 MB` decoder weights.
+
+---
+
+## Quick Start
+
+### 1. Single-Frame Inference Demo
+```bash
+python scripts/infer_single.py \
+  --radar-png /path/to/RadarHD/dataset_5/test/radar/R_232_354.png \
+  --lidar-png /path/to/RadarHD/dataset_5/test/lidar/L_232_354.png \
+  --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth \
+  --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
+  --dinov3-repo /path/to/dinov3 \
+  --out-prefix outputs/demo_232_354
+```
+For **Compact Mode** (zero retraining, ~20% fewer points), pass `--budget-frac 0.25`.
+
+### 2. Evaluate on RadarHD
+```bash
+python scripts/eval_radarhd.py \
+  --config configs/radarhd.yaml \
+  --data-root /path/to/RadarHD/dataset_5 \
+  --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
+  --dinov3-repo /path/to/dinov3 \
+  --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth \
+  --output-json outputs/radarhd_eval.json
+```
+
+### 3. Train from Scratch (~40 min on a Single GPU)
+```bash
+python scripts/train.py \
+  --config configs/radarhd.yaml \
+  --data-root /path/to/RadarHD/dataset_5 \
+  --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
+  --dinov3-repo /path/to/dinov3 \
+  --variant full \
+  --seed 45
+```
+
+### 4. Benchmark Strict `Batch=1` Latency
+```bash
+python scripts/benchmark_latency.py \
+  --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
+  --dinov3-repo /path/to/dinov3 \
+  --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth
+```
+
+---
+
+## Datasets & Acknowledgements
+
+- **RadarHD**: Download `dataset_5` from [akarsh-prabhakara/RadarHD](https://github.com/akarsh-prabhakara/RadarHD).
+- **ColoRadar**: Download sequences and calibration files from [arpg.github.io/coloradar](https://arpg.github.io/coloradar/).
+- Built upon frozen representations from [Meta DINOv3](https://github.com/facebookresearch/dinov3).
+
+## Citation
+
+```bibtex
+@article{polarskip_dino_2026,
+  title   = {Real-Time Single-Frame Indoor mmWave Radar Point Cloud Reconstruction with Frozen Visual Backbones and Dual-Tier Readout},
+  author  = {Author List},
+  year    = {2026}
+}
+```

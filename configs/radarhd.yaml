@@ -1,0 +1,26 @@
+# Default RadarHD configuration for PolarSkip-DINO (Full / Lite)
+
+data:
+  radarhd_root: "/path/to/RadarHD/dataset_5"
+
+model:
+  variant: "full" # "full" (24.10M total / 2.50M trainable) or "lite" (23.92M / 2.31M)
+  dino_weights: "/path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth"
+  dinov3_repo: null # Optional path to a local clone of facebookresearch/dinov3
+
+train:
+  steps: 8000
+  batch_size: 16
+  lr: 3.0e-4
+  weight_decay: 1.0e-2
+  pos_weight: 3.0
+  seed: 45
+  num_workers: 4
+  output_dir: "outputs/radarhd_full"
+
+readout:
+  tau_hi: 0.006
+  tau_lo: 0.002
+  budget_frac: 0.35 # Use 0.25 for zero-retraining Compact Mode
+  weak_frac: 0.15
+  max_points: 1750

@@ -1,0 +1,22 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Model weights, datasets, and runtime outputs
+checkpoints/*.pth
+checkpoints/*.pt
+checkpoints/*.safetensors
+data/
+outputs/
+runs/
+*.log
+*.npz
+*.npy
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

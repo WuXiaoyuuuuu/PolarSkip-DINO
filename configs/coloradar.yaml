@@ -1,0 +1,28 @@
+# ColoRadar cross-sensor Zero-Shot & 3-Fold Leave-One-Building-Out (LOBO) config
+
+data:
+  coloradar_root: "/path/to/ColoRadar"
+  min_range_m: 0.253
+  max_az_deg: 70.0
+  elevation_mode: "slice_mid2" # Horizontal mid-2 elevation bins (+-3.54 deg)
+
+lobo_adapt:
+  steps: 800
+  batch_size: 16 # 8 + 8 balanced across the two training buildings
+  lr: 3.0e-5
+  weight_decay: 1.0e-2
+  pos_weight: 3.0
+
+readout_zeroshot:
+  tau_hi: 0.006
+  tau_lo: 0.002
+  budget_frac: 0.35
+  weak_frac: 0.15
+  max_points: 1750
+
+readout_lobo:
+  tau_hi: 0.30
+  tau_lo: 0.10
+  budget_frac: 0.35
+  weak_frac: 0.15
+  max_points: 1750
