@@ -22,10 +22,12 @@ PolarSkip-DINO reconstructs dense, LiDAR-like 2D indoor point clouds from a **si
 | RadarHD (41-frame, ICRA 2023) | 17.51M / 17.51M | 54.54 | 18.4 (54.3 Hz) | 0.4593 | 47.79% | 34.65% | 23.72% | 22.28% |
 | RadarSFD (50-step, FP16) | 868.37M / 865.92M | 18,755.73 | 4,228.8 (0.24 Hz) | 0.3552 | 52.90% | 38.22% | 25.50% | 21.82% |
 | **PolarSkip-DINO (Lite)** | 23.92M / 2.31M | 59.97 | — | 0.3018 | 59.66% | 41.86% | 28.13% | 32.85% |
-| **PolarSkip-DINO (Full, FP16)** | **24.10M / 2.50M** | **63.08** | **25.8 (38.7 Hz)** | **0.3000** | **60.52%** | **43.17%** | **29.50%** | **32.51%** |
-| *PolarSkip-DINO (Same-K)* | *24.10M / 2.50M* | *63.08* | *25.8* | *0.3120* | *58.95%* | *41.78%* | *28.27%* | *27.96%* |
+| **PolarSkip-DINO (Full)** | **24.10M / 2.50M** | **63.08** | **25.8 (38.7 Hz, FP16)** | **0.3000** | **60.52%** | **43.17%** | **29.50%** | **32.51%** |
+| *PolarSkip-DINO (Same-K, 938 pts)* | *24.10M / 2.50M* | *63.08* | *25.8* | *0.3120* | *58.95%* | *41.78%* | *28.27%* | *27.96%* |
 
-On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO reduces sequential point-to-point ICP translation error by **2.6–3.1×** (`2.21–3.13 cm` vs. `6.92–8.21 cm`) and improves reference-pose 2D occupancy grid mapping IoU up to **43.5%** vs. `36.4%`. When chaining self-estimated ICP poses without external odometry, PolarSkip-DINO reduces trajectory ATE RMSE to **`0.288 m` / `0.727 m`** (vs. `RadarSFD` `1.113 m` / `0.990 m`) and raises self-pose mapping IoU to **`34.2%` / `27.2%`** (vs. `31.5%` / `20.4%`).
+*Note: Table accuracy reports 3-seed means on the 18,075-frame held-out split (`60.52%` FP32 / `60.53%` FP16 `F1@20cm`, `0.3000 m` / `0.3001 m` CD); `eval_radarhd.py` evaluates a single specified checkpoint (e.g., `seed45`). Strict `Batch=1` FP16 latency is `25.8 ms` (`38.7 Hz`) with per-module sync and `25.4 ms` (`39.4 Hz`) end-to-end.*
+
+On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO reduces sequential point-to-point ICP translation error by **2.6–3.1×** (`2.21–3.13 cm` vs. `6.92–8.21 cm`) and improves reference-pose 2D occupancy grid mapping IoU up to **43.5%** vs. `36.4%`.
 
 ![RadarHD Single-Frame Comparison](assets/radarhd_comparison.png)
 
