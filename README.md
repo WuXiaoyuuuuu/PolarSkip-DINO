@@ -2,30 +2,30 @@
 
 **Real-Time Single-Frame Indoor mmWave Radar Point Cloud Reconstruction with Frozen Visual Backbones and Dual-Tier Readout**
 
-PolarSkip-DINO reconstructs dense, LiDAR-like 2D indoor point clouds from a **single 77 GHz mmWave radar frame** at **20.6 Hz (`48.52 ms`)** on a single GPU.
+PolarSkip-DINO reconstructs dense, LiDAR-like 2D indoor point clouds from a **single 77 GHz mmWave radar frame** at **38.7 Hz (`25.8 ms`, FP16)** on a single RTX 4090 D GPU.
 
 ### Highlights
 - **Frozen Visual Backbone + Cartesian Decoding**: Transfers a completely frozen **DINOv3-S/16** encoder into an isotropic metric Cartesian U-Net decoder, avoiding range-dependent polar convolutional distortion.
-- **Lightweight PolarSkip Branch (`+0.19M` params)**: Preserves native 64-bin angular resolution with azimuthally dilated residual blocks (`dilation=(1, 2)`) to sharpen wall centerlines and reduce cross-seed variance by over `6×`.
-- **Zero-Training Dual-Tier Readout (`1.74 ms` CPU)**: Combines top-scoring primary pixels with deterministic uniform sampling over the weak-support probability band to recover far-field (`≥6 m`) walls without retraining.
-- **Real-Time & Portable**: Only **2.50M trainable parameters** (`24.10M` total, `63.08 GFLOPs`) — **87.2× faster**, **297× fewer FLOPs**, and **36.0× fewer parameters** than 50-step latent diffusion (`RadarSFD`).
+- **Lightweight PolarSkip Branch (`+0.19M` params)**: Preserves native 64-bin angular resolution with azimuthally dilated residual blocks (`dilation=(1, 2)`) to sharpen wall centerlines (`71.9 -> 64.0 mm`) and fine-tolerance alignment (`F1@5cm: 28.13% -> 29.50%`).
+- **Zero-Training Dual-Tier Readout (`0.89 ms` CPU)**: Combines top-scoring primary pixels with deterministic uniform sampling over the weak-support probability band to recover far-field (`≥6 m`) walls without retraining.
+- **Real-Time & Portable**: Only **2.50M trainable parameters** (`24.10M` total, `63.08 GFLOPs`) — **163.7× faster**, **297× fewer FLOPs**, and **36.0× fewer parameters** than 50-step latent diffusion (`RadarSFD`).
 
 ---
 
 ## Main Results
 
-### 1. RadarHD Benchmark (`18,075` Held-Out Test Frames, 19 Trajectories)
+### 1. RadarHD Benchmark (`18,075` Test Frames, 19 Trajectories, Excluding `configs/dev500_sids.json`)
 
 | Method | Total / Trainable Params | `bs=1` GFLOPs | Strict `bs=1` E2E (ms) | CD (m) ↓ | F1@20cm ↑ | F1@10cm ↑ | F1@5cm ↑ | ≥6m Recall ↑ |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| U-Net (Scratch) | 1.93M / 1.93M | 36.88 | — | 0.5938 | 37.10% | 25.67% | 16.26% | 9.58% |
-| RadarHD (ICRA 2023) | — | — | — | 0.4593 | 47.79% | 34.65% | 23.72% | 22.28% |
-| RadarSFD (50-step, FP16) | 868.37M / — | 18,755.73 | 4,228.77 | 0.3552 | 52.90% | 38.22% | 25.50% | 21.82% |
-| **PolarSkip-DINO (Lite, 3-seed)** | 23.92M / 2.31M | 59.97 | **42.95 (23.3 Hz)** | 0.3018 | 59.66% | 41.86% | 28.13% | 32.85% |
-| **PolarSkip-DINO (Full, 3-seed)** | **24.10M / 2.50M** | **63.08** | **48.52 (20.6 Hz)** | **0.3000** | **60.52%** | **43.17%** | **29.50%** | **32.51%** |
-| *PolarSkip-DINO (Same-K ≈ 939)* | *24.10M / 2.50M* | *63.08* | *48.52* | *0.3119* | *58.97%* | *41.79%* | *28.23%* | *28.23%* |
+| U-Net (Scratch) | 1.93M / 1.93M | 36.88 | 6.6 (151.8 Hz) | 0.5938 | 37.10% | 25.67% | 16.26% | 9.58% |
+| RadarHD (41-frame, ICRA 2023) | 17.51M / 17.51M | 54.54 | 18.4 (54.3 Hz) | 0.4593 | 47.79% | 34.65% | 23.72% | 22.28% |
+| RadarSFD (50-step, FP16) | 868.37M / 865.92M | 18,755.73 | 4,228.8 (0.24 Hz) | 0.3552 | 52.90% | 38.22% | 25.50% | 21.82% |
+| **PolarSkip-DINO (Lite)** | 23.92M / 2.31M | 59.97 | — | 0.3018 | 59.66% | 41.86% | 28.13% | 32.85% |
+| **PolarSkip-DINO (Full, FP16)** | **24.10M / 2.50M** | **63.08** | **25.8 (38.7 Hz)** | **0.3000** | **60.52%** | **43.17%** | **29.50%** | **32.51%** |
+| *PolarSkip-DINO (Same-K)* | *24.10M / 2.50M* | *63.08* | *25.8* | *0.3120* | *58.95%* | *41.78%* | *28.27%* | *27.96%* |
 
-On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO reduces sequential point-to-point ICP translation error by **2.2–3.3×** (`2.09–3.70 cm` vs. `6.92–8.21 cm`) and improves multi-frame 2D occupancy grid mapping IoU up to **44.6%** vs. `36.4%`.
+On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO reduces sequential point-to-point ICP translation error by **2.6–3.1×** (`2.21–3.13 cm` vs. `6.92–8.21 cm`) and improves reference-pose 2D occupancy grid mapping IoU up to **43.5%** vs. `36.4%`. When chaining self-estimated ICP poses without external odometry, PolarSkip-DINO reduces trajectory ATE RMSE to **`0.288 m` / `0.727 m`** (vs. `RadarSFD` `1.113 m` / `0.990 m`) and raises self-pose mapping IoU to **`34.2%` / `27.2%`** (vs. `31.5%` / `20.4%`).
 
 ![RadarHD Single-Frame Comparison](assets/radarhd_comparison.png)
 
@@ -48,7 +48,8 @@ On clean contiguous test trajectories (`traj_237`, `traj_230`), PolarSkip-DINO r
 PolarSkip-DINO/
 ├── configs/
 │   ├── radarhd.yaml          # RadarHD training & dual-tier readout config
-│   └── coloradar.yaml        # ColoRadar zero-shot & 3-fold LOBO config
+│   ├── coloradar.yaml        # ColoRadar zero-shot & 3-fold LOBO config
+│   └── dev500_sids.json      # 500 dev sample IDs excluded from the 18,075 test split
 ├── polarskip_dino/
 │   ├── geometry.py           # Exact voxel-center polar <-> Cartesian grids
 │   ├── model.py              # Frozen DINOv3-S/16 + PolarSkip + Cartesian U-Net
@@ -94,7 +95,7 @@ python scripts/infer_single.py \
 ```
 For **Compact Mode** (zero retraining, ~20% fewer points), pass `--budget-frac 0.25`.
 
-### 2. Evaluate on RadarHD
+### 2. Evaluate on RadarHD (`18,075` Test Frames)
 ```bash
 python scripts/eval_radarhd.py \
   --config configs/radarhd.yaml \
@@ -102,6 +103,8 @@ python scripts/eval_radarhd.py \
   --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
   --dinov3-repo /path/to/dinov3 \
   --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth \
+  --exclude-ids-json configs/dev500_sids.json \
+  --precision fp16 \
   --output-json outputs/radarhd_eval.json
 ```
 
@@ -116,12 +119,14 @@ python scripts/train.py \
   --seed 45
 ```
 
-### 4. Benchmark Strict `Batch=1` Latency
+### 4. Benchmark Strict `Batch=1` Latency (FP16)
 ```bash
 python scripts/benchmark_latency.py \
   --dino-weights /path/to/dinov3_vits16_pretrain_lvd1689m-08c60483.pth \
   --dinov3-repo /path/to/dinov3 \
-  --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth
+  --checkpoint checkpoints/polarskip_dino_radarhd_seed45.pth \
+  --radar-dir /path/to/RadarHD/dataset_5/test/radar \
+  --precision fp16
 ```
 
 ---

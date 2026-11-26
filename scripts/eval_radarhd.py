@@ -37,6 +37,14 @@ def main() -> None:
     parser.add_argument("--dino-weights", type=str, default=None)
     parser.add_argument("--dinov3-repo", type=str, default=None)
     parser.add_argument("--variant", choices=["full", "lite"], default="full")
+    parser.add_argument("--precision", choices=["fp16", "fp32"], default="fp16")
+    parser.add_argument(
+        "--exclude-ids-json",
+        type=str,
+        default=str(REPO_ROOT / "configs/dev500_sids.json"),
+        help="JSON list of held-out dev sample IDs to exclude (default: paper's 500 dev IDs -> 18,075 test frames)",
+    )
+    parser.add_argument("--include-all-test", action="store_true", help="Evaluate all 18,575 test frames without exclusion")
     parser.add_argument("--budget-frac", type=float, default=None, help="0.35 (default) or 0.25 (compact)")
     parser.add_argument("--max-samples", type=int, default=None, help="Optional subset size for quick check")
     parser.add_argument("--output-json", type=str, default=None)
@@ -50,12 +58,32 @@ def main() -> None:
     budget_frac = args.budget_frac if args.budget_frac is not None else float(rcfg["budget_frac"])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use_fp16 = (args.precision == "fp16") and (device.type == "cuda")
+    dtype = torch.float16 if use_fp16 else torch.float32
+
     geom = RadarGeometry(device=device)
+    geom_run = geom
+    if use_fp16:
+        geom_run = RadarGeometry(device=device)
+        for attr in (
+            "dino_cart_grid_64", "cart_grid_64", "cart_grid_128", "cart_grid_256",
+            "m_roi_64", "m_roi_128", "m_roi_256", "polar_geo_channels",
+            "imagenet_mean", "imagenet_std", "black_pad",
+        ):
+            v = getattr(geom_run, attr)
+            if torch.is_tensor(v):
+                setattr(geom_run, attr, v.to(dtype=dtype))
+
     model = PolarSkipDINO(dino_weights, dinov3_repo=dinov3_repo, use_polar_skip=(args.variant == "full")).to(device).eval()
     model.load_decoder_checkpoint(args.checkpoint)
+    if use_fp16:
+        model = model.to(dtype=dtype).eval()
 
-    dataset = RadarHDDataset(data_root=data_root, split="test", max_samples=args.max_samples)
-    print(f"[Eval] Loaded {len(dataset)} RadarHD test frames | checkpoint={Path(args.checkpoint).name} | d={budget_frac}")
+    exclude_ids = None
+    if not args.include_all_test and args.exclude_ids_json and Path(args.exclude_ids_json).is_file():
+        exclude_ids = json.loads(Path(args.exclude_ids_json).read_text(encoding="utf-8"))
+    dataset = RadarHDDataset(data_root=data_root, split="test", exclude_ids=exclude_ids, max_samples=args.max_samples)
+    print(f"[Eval] Loaded {len(dataset)} RadarHD test frames | checkpoint={Path(args.checkpoint).name} | d={budget_frac} | precision={args.precision}")
 
     t0 = time.monotonic()
     all_metrics = []
@@ -64,8 +92,8 @@ def main() -> None:
     for idx in range(len(dataset)):
         item = dataset[idx]
         sid = item["sample_id"]
-        raw = item["raw_polar"].unsqueeze(0).to(device)
-        prob = torch.sigmoid(model(raw, geom)).squeeze().cpu().numpy()
+        raw = item["raw_polar"].unsqueeze(0).to(device=device, dtype=dtype)
+        prob = (torch.sigmoid(model(raw, geom_run).float()) * geom.m_roi_256.float()).squeeze().cpu().numpy()
         pred_pts = dual_tier_readout(
             prob,
             sample_id=sid,
