@@ -106,7 +106,8 @@ def main() -> None:
         )
         gt_pts = polar_lidar_to_points(item["lidar_u8"])
         m = compute_pointcloud_metrics(pred_pts, gt_pts, thresholds=(0.20, 0.10, 0.05), far_range_m=6.0)
-        if m["cd"] is not None:
+        if len(gt_pts) > 0:
+            m["empty_pred"] = int(len(pred_pts) == 0)
             all_metrics.append(m)
             per_traj[item["traj_id"]].append(m)
         if (idx + 1) % 2000 == 0 or (idx + 1) == len(dataset):
@@ -121,6 +122,8 @@ def main() -> None:
         "variant": args.variant,
         "budget_frac": budget_frac,
         "num_frames": len(all_metrics),
+        "num_empty_pred_frames": int(sum(r.get("empty_pred", 0) for r in all_metrics)),
+        "num_cd_valid_frames": int(sum(1 for r in all_metrics if r.get("cd") is not None)),
         "pts": _mean(all_metrics, "pts"),
         "cd_m": _mean(all_metrics, "cd"),
         "pred_to_gt_m": _mean(all_metrics, "p2g"),
