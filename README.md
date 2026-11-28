@@ -40,7 +40,7 @@ Frozen **DINOv3-S/16** and the trainable **PolarSkip** branch extract global str
 
 *Notes:*
 - *Accuracy reports 3-seed means evaluated against raw LiDAR GT-PCD (`60.52%` FP32 / `60.53%` FP16 `F1@20cm`, `0.3000 m` / `0.3001 m` CD, zero empty predictions). `eval_radarhd.py` evaluates a single specified checkpoint (e.g., `seed45`). Strict `Batch=1` FP16 latency is `25.8 ms` (`38.7 Hz`) with per-module sync and `25.4 ms` (`39.4 Hz`) end-to-end; Zhang et al. [26] is timed in its faster official FP32 mode (FP16: `71.0 ms`).*
-- *Training-side held-out trajectory verification (locking readout strictly on 3 held-out training trajectories and evaluating on all **18,575** official test frames): PolarSkip-DINO reaches **61.14% F1@20cm** (`0.3077 m` CD, **19/19 trajectories won** vs. RadarSFD, Wilcoxon $p = 3.81 \times 10^{-6}$) and **60.40% vs. 52.86%** under Same-K (**18/19 trajectories**).*
+- *Training-side held-out trajectory verification across all **18,575** official test frames (locking readout strictly on 3 held-out training trajectories): PolarSkip-DINO reaches **61.14% F1@20cm**, outperforms RadarSFD on all **19/19 trajectories**, and holds **60.40% vs. 52.86%** under Same-K.*
 - *Downstream trajectories (`traj_237`, `traj_230`): reduces adjacent-frame ICP translation error by **2.6–3.1×** (`2.21–3.13 cm` vs. `6.92–8.21 cm`) and lifts reference-pose 2D occupancy grid mapping IoU up to **43.5%** vs. `36.4%`.*
 
 ![RadarHD Qualitative Reconstruction](assets/fig4_radarhd_qualitative.png)
